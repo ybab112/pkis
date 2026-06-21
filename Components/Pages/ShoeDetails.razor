@@ -1,0 +1,112 @@
+@page "/shoe/{Id:int}"
+@using Microsoft.AspNetCore.Components.Authorization
+@using MyWebApp.Data
+@using MyWebApp.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+
+@inject IServiceScopeFactory ScopeFactory
+@inject MyWebApp.Services.CartService CartService
+
+<PageTitle>@shoe?.Name</PageTitle>
+
+@if (shoe == null)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Загрузка товара...</p>
+    </div>
+}
+else
+{
+    <div class="row mt-4">
+        <div class="col-md-6">
+            @if (!string.IsNullOrEmpty(shoe.ImagePath))
+            {
+                <img src="@shoe.ImagePath" class="img-fluid rounded shadow" alt="@shoe.Name" style="width:100%; max-height:500px; object-fit:cover;" />
+            }
+            else
+            {
+                <div class="bg-secondary text-white d-flex align-items-center justify-content-center rounded shadow" style="height: 400px;">
+                    <i class="bi bi-image" style="font-size: 5rem;"></i>
+                </div>
+            }
+        </div>
+        <div class="col-md-6">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/shoes">Каталог</a></li>
+                    <li class="breadcrumb-item active">@shoe.Name</li>
+                </ol>
+            </nav>
+            <h1 class="display-5 fw-bold mb-3">@shoe.Name</h1>
+            <h2 class="text-primary mb-4">@shoe.Price.ToString("N0") ₽</h2>
+            
+            <p class="lead text-secondary mt-3">@shoe.Description</p>
+            
+            <hr class="my-4" />
+            
+            @* ВЫБОР РАЗМЕРА *@
+            <div class="mb-4">
+                <label class="form-label fw-bold">Выберите размер:</label>
+                @if (shoe?.ShoeSizes != null && shoe.ShoeSizes.Any(s => s.Quantity > 0))
+                {
+                    <select @bind="selectedSize" class="form-select" style="width: 200px;">
+                        @foreach (var sz in shoe.ShoeSizes.Where(s => s.Quantity > 0))
+                        {
+                            <option value="@sz.Size">Размер: @sz.Size</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <p class="text-danger">Товара нет в наличии</p>
+                }
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                <AuthorizeView Context="authState">
+                    <Authorized>
+                        <button class="btn btn-primary btn-lg px-5 me-md-2" @onclick="() => CartService.AddToCart(authState.User.Identity?.Name, shoe!, selectedSize)">
+                            <i class="bi bi-cart-plus me-2"></i>Добавить в корзину
+                        </button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="btn btn-outline-primary btn-lg px-5 me-md-2">
+                            Войдите для покупки
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+                <a href="/shoes" class="btn btn-outline-secondary btn-lg px-4">Назад в каталог</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Shoe? shoe;
+    
+    private int selectedSize = 0; 
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        shoe = await dbContext.Shoes
+            .Include(s => s.ShoeSizes)
+            .FirstOrDefaultAsync(s => s.Id == Id);
+            
+        if (shoe?.ShoeSizes != null)
+        {
+            var firstSizeStr = shoe.ShoeSizes.FirstOrDefault(s => s.Quantity > 0)?.Size;
+            if (firstSizeStr != null && int.TryParse(firstSizeStr, out int parsedSize))
+            {
+                selectedSize = parsedSize;
+            }
+        }
+    }
+}

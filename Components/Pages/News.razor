@@ -1,0 +1,47 @@
+@page "/news"
+<PageTitle>Новости магазина</PageTitle>
+
+<div class="container mt-4 mb-5">
+    <h2 class="mb-4 fw-bold"><i class="bi bi-newspaper text-primary"></i> Наши новости</h2>
+
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <span class="badge bg-primary mb-2">Новая коллекция</span>
+                    <h5 class="card-title fw-bold">Поступление летней коллекции 2024!</h5>
+                    <p class="card-text text-muted">Спешите обновить гардероб. В продажу поступили новые легкие кроссовки от Nike и Adidas, идеально подходящие для жаркой погоды.</p>
+                </div>
+                <div class="card-footer bg-white border-0 text-muted small">
+                    <i class="bi bi-calendar"></i> Опубликовано: @DateTime.Now.AddDays(-2).ToString("dd.MM.yyyy")
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <span class="badge bg-success mb-2">Акции</span>
+                    <h5 class="card-title fw-bold">Грандиозная распродажа Кед!</h5>
+                    <p class="card-text text-muted">Только до конца месяца скидки на все классические кеды Vans и Converse до 30%. Успейте забрать свой размер.</p>
+                </div>
+                <div class="card-footer bg-white border-0 text-muted small">
+                    <i class="bi bi-calendar"></i> Опубликовано: @DateTime.Now.AddDays(-5).ToString("dd.MM.yyyy")
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <span class="badge bg-info mb-2 text-dark">Магазин</span>
+                    <h5 class="card-title fw-bold">Открытие нового пункта самовывоза</h5>
+                    <p class="card-text text-muted">Мы становимся ближе! Теперь вы можете бесплатно примерить и забрать свой заказ в новом центре выдачи на ул. Ленина.</p>
+                </div>
+                <div class="card-footer bg-white border-0 text-muted small">
+                    <i class="bi bi-calendar"></i> Опубликовано: @DateTime.Now.AddDays(-10).ToString("dd.MM.yyyy")
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

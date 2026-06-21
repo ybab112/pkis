@@ -1,0 +1,135 @@
+@page "/manager/orders"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@attribute [Authorize(Roles = "Системный администратор, Администратор, Менеджер")]
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+
+@using MyWebApp.Models
+@using Microsoft.EntityFrameworkCore
+@using MyWebApp.Data
+@inject IServiceScopeFactory ScopeFactory
+
+<h2 class="mb-4">Управление заказами</h2>
+
+@if (!string.IsNullOrEmpty(debugMessage))
+{
+    <div class="alert alert-info fw-bold">
+        <i class="bi bi-info-circle me-2"></i> @debugMessage
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>№ Заказа</th>
+                    <th>Покупатель</th>
+                    <th>Дата создания</th>
+                    <th>Сумма</th>
+                    <th>Статус заказа</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var order in ordersList)
+                {
+                    <tr>
+                        <td><strong>#@order.Id</strong></td>
+                        <td>@(order.User?.Email ?? "Гость / Не указан")</td>
+                        <td>@order.OrderDate.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@order.TotalPrice.ToString("N2") ₽</td>
+                        <td>
+                            <select class="form-select form-select-sm" 
+                                    value="@((int)order.Status)" 
+                                    @onchange="(e) => OnStatusSelectionChanged(order.Id, e)">
+                                
+                                @foreach (OrderStatus status in Enum.GetValues(typeof(OrderStatus)))
+                                {
+                                    <option value="@((int)status)">@GetStatusDisplayName(status)</option>
+                                }
+                            </select>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<Order> ordersList = new();
+    private string debugMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        ordersList = await context.Orders
+            .Include(o => o.User)
+            .OrderByDescending(o => o.OrderDate)
+            .AsNoTracking() 
+            .ToListAsync();
+    }
+
+    private async Task OnStatusSelectionChanged(int orderId, ChangeEventArgs e)
+    {
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out int statusInt))
+        {
+            await ChangeOrderStatus(orderId, (OrderStatus)statusInt);
+        }
+    }
+
+    private async Task ChangeOrderStatus(int orderId, OrderStatus targetStatus)
+    {
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var order = await context.Orders.FindAsync(orderId);
+            if (order != null)
+            {
+                order.Status = targetStatus;
+                
+                context.Entry(order).Property(o => o.Status).IsModified = true;
+                
+                int changes = await context.SaveChangesAsync();
+                
+                if (changes > 0)
+                {
+                    debugMessage = $"Заказ #{orderId} успешно переведен в статус «{GetStatusDisplayName(targetStatus)}».";
+                }
+                else
+                {
+                    debugMessage = $"Заказ #{orderId} найден, но статус не изменился.";
+                }
+                
+                await LoadOrders(); 
+            }
+            else
+            {
+                debugMessage = $"Ошибка: Заказ #{orderId} не найден в базе данных.";
+            }
+        }
+        catch (Exception ex)
+        {
+            debugMessage = $"Критическая ошибка БД: {ex.Message}";
+        }
+    }
+
+    private string GetStatusDisplayName(OrderStatus status) => status switch
+    {
+        OrderStatus.New => "Новый",
+        OrderStatus.Processed => "В обработке",
+        OrderStatus.Shipped => "В пути",
+        OrderStatus.Completed => "Доставлен",
+        OrderStatus.Cancelled => "Отменен",
+        _ => status.ToString()
+    };
+}

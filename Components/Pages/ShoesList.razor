@@ -1,0 +1,256 @@
+@page "/shoes"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MyWebApp.Data
+@using MyWebApp.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+
+@inject IServiceScopeFactory ScopeFactory
+@inject MyWebApp.Services.CartService CartService
+
+<PageTitle>Каталог обуви</PageTitle>
+
+<h2 class="mb-4">Каталог обуви</h2>
+
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-funnel"></i> Фильтры</h5>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Пол</label>
+                    <select class="form-select" @bind="selectedGender">
+                        <option value="">Любой</option>
+                        <option value="Мужской">Мужской</option>
+                        <option value="Женский">Женский</option>
+                        <option value="Унисекс">Унисекс</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Категория</label>
+                    <select class="form-select" @bind="selectedCategory">
+                        <option value="">Все категории</option> 
+                        <hr>
+                        <option value="Ботинки">Ботинки</option>
+                        <option value="Кроссовки">Кроссовки</option>
+                        <option value="Туфли на каблуке">Туфли на каблуке</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Сезон</label>
+                    <select class="form-select" @bind="selectedSeason">
+                        <option value="">Любой сезон</option>
+                        <option value="Зима">Зима</option>
+                        <option value="Лето">Лето</option>
+                        <option value="Демисезон">Демисезон</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Размер в наличии</label>
+                    <select class="form-select" @bind="filterSize">
+                        <option value="">Любой размер</option>
+                        @for (int i = 35; i <= 46; i++) 
+                        {
+                            <option value="@i">@i</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold small">Сортировка</label>
+                    <select class="form-select" @bind="sortOrder">
+                        <option value="">По умолчанию</option>
+                        <option value="price_asc">Сначала дешевые</option>
+                        <option value="price_desc">Сначала дорогие</option>
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" @onclick="ApplyFilters">Показать</button>
+                    <button class="btn btn-outline-secondary" @onclick="ResetFilters">Сбросить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        @if (shoes == null)
+        {
+            <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
+                <div class="spinner-border text-primary" role="status"></div>
+                <span class="ms-3">Загрузка товаров...</span>
+            </div>
+        }
+        else if (!shoes.Any())
+        {
+            <div class="alert alert-info text-center" role="alert">
+                По вашему запросу ничего не найдено. Попробуйте изменить параметры фильтра.
+            </div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-3 g-4">
+                @foreach (var shoe in shoes)
+                {
+                    <div class="col">
+                        <div class="card h-100 shadow-sm border-0">
+                            <a href="/shoe/@shoe.Id">
+                                <img src="@(string.IsNullOrEmpty(shoe.ImagePath) ? "/img/no-image.png" : shoe.ImagePath)" 
+                                     class="card-img-top" alt="@shoe.Name" style="height: 250px; object-fit: cover;">
+                            </a>
+                            <div class="card-body text-center d-flex flex-column">
+                                <p class="text-muted small mb-1">@(shoe.Brand != null ? shoe.Brand.Name : "Без бренда")</p>
+                                <h5 class="card-title mb-2">
+                                    <a href="/shoe/@shoe.Id" class="text-dark text-decoration-none">@shoe.Name</a>
+                                </h5>
+
+                                <div class="d-flex justify-content-center flex-wrap gap-1 mb-2">
+                                    @if (!string.IsNullOrEmpty(shoe.Gender))
+                                    {
+                                        <span class="badge bg-light text-dark border" title="Пол">
+                                            <i class="bi bi-person"></i> @shoe.Gender
+                                        </span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(shoe.Season))
+                                    {
+                                        <span class="badge bg-light text-dark border" title="Сезон">
+                                            <i class="bi bi-cloud-sun"></i> @shoe.Season
+                                        </span>
+                                    }
+                                </div>
+
+                                <p class="card-text fw-bold fs-5 text-primary mb-3">@shoe.Price.ToString("N0") ₽</p>
+
+                                <div class="mt-auto">
+                                    <select @bind="selectedSizes[shoe.Id]" class="form-select mb-3 form-select-sm">
+                                        @if (shoe.ShoeSizes != null && shoe.ShoeSizes.Any(s => s.Quantity > 0))
+                                        {
+                                            @foreach (var sz in shoe.ShoeSizes.Where(s => s.Quantity > 0))
+                                            {
+                                                <option value="@sz.Size">Размер: @sz.Size</option>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <option value="">Нет в наличии</option>
+                                        }
+                                    </select>
+
+                                    <AuthorizeView Context="authState">
+                                        <Authorized>
+                                            <button class="btn btn-primary w-100 btn-sm" 
+                                                    @onclick="() => CartService.AddToCart(authState.User.Identity?.Name, shoe, selectedSizes[shoe.Id])">
+                                                <i class="bi bi-cart-plus"></i> В корзину
+                                            </button>
+                                        </Authorized>
+                                        <NotAuthorized>
+                                            <a href="/login" class="btn btn-outline-primary w-100 btn-sm">Войдите для покупки</a>
+                                        </NotAuthorized>
+                                    </AuthorizeView>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Shoe>? shoes;
+    private Dictionary<int, int> selectedSizes = new();
+
+    private string? selectedGender = "";
+    private string? selectedCategory = "";
+    private string? selectedSeason = "";
+    private int? filterSize;
+    private string? sortOrder = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadShoes();
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadShoes();
+    }
+
+    private async Task ResetFilters()
+    {
+        selectedGender = "";
+        selectedCategory = "";
+        selectedSeason = "";
+        filterSize = null;
+        sortOrder = "";
+        await LoadShoes();
+    }
+
+    private async Task LoadShoes()
+    {
+        shoes = null; 
+
+        using var scope = ScopeFactory.CreateScope();
+        var scopedDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var query = scopedDbContext.Shoes
+            .Include(s => s.Brand)
+            .Include(s => s.Category) 
+            .Include(s => s.ShoeSizes) 
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(selectedGender))
+        {
+            query = query.Where(s => s.Gender == selectedGender);
+        }
+
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            query = query.Where(s => s.Category != null && s.Category.Name == selectedCategory);
+        }
+
+        if (!string.IsNullOrEmpty(selectedSeason))
+        {
+            query = query.Where(s => s.Season == selectedSeason);
+        }
+
+        if (filterSize.HasValue)
+        {
+            var sizeString = filterSize.Value.ToString();
+            query = query.Where(s => s.ShoeSizes.Any(sz => sz.Size == sizeString && sz.Quantity > 0));
+        }
+
+        query = sortOrder switch
+        {
+            "price_asc" => query.OrderBy(s => s.Price),
+            "price_desc" => query.OrderByDescending(s => s.Price),
+            _ => query.OrderBy(s => s.Name) 
+        };
+
+        shoes = await query.ToListAsync();
+
+        foreach (var s in shoes) 
+        { 
+            if (!selectedSizes.ContainsKey(s.Id))
+            {
+                var firstSize = s.ShoeSizes?.FirstOrDefault(sz => sz.Quantity > 0)?.Size;
+                if (firstSize != null && int.TryParse(firstSize, out int parsedSize))
+                {
+                    selectedSizes[s.Id] = parsedSize;
+                }
+                else
+                {
+                    selectedSizes[s.Id] = s.Gender == "Женский" ? 38 : 42; 
+                }
+            }
+        } 
+    }
+}

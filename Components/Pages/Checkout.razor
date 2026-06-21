@@ -1,0 +1,140 @@
+@page "/checkout"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using MyWebApp.Data
+@using MyWebApp.Models
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject MyWebApp.Services.CartService CartService
+@inject AppDbContext DbContext
+@inject NavigationManager Navigation
+@inject UserManager<IdentityUser> UserManager
+
+<PageTitle>Оформление заказа</PageTitle>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">Оформление заказа</h3>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Способ получения:</label>
+                        <select @bind="deliveryType" class="form-select">
+                            <option value="Доставка">Доставка курьером</option>
+                            <option value="Самовывоз">Самовывоз из магазина</option>
+                        </select>
+                    </div>
+
+                    @if (deliveryType == "Доставка")
+                    {
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Адрес доставки:</label>
+                            <textarea @bind="address" class="form-control" placeholder="Город, улица, дом, квартира..." rows="3"></textarea>
+                        </div>
+                    }
+
+                    <div class="alert alert-info">
+                        <strong>К оплате:</strong> @totalPrice.ToString("N0") ₽
+                    </div>
+
+                    <button class="btn btn-success w-100 btn-lg mt-2" @onclick="PlaceOrder" disabled="@isProcessing">
+                        @if (isProcessing) { <span class="spinner-border spinner-border-sm"></span> }
+                        Оплатить и оформить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+    
+    private string deliveryType = "Доставка";
+    private string address = "";
+    private decimal totalPrice = 0;
+    private bool isProcessing = false;
+    private string? userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            userName = authState.User.Identity?.Name;
+            totalPrice = CartService.GetTotalPrice(userName);
+            
+            if (totalPrice == 0)
+            {
+                Navigation.NavigateTo("/cart"); 
+            }
+        }
+    }
+
+    private async Task PlaceOrder()
+    {
+        isProcessing = true;
+        
+        if (AuthStateTask == null) return;
+        var authState = await AuthStateTask;
+        var user = await UserManager.GetUserAsync(authState.User);
+        
+        if (user == null) return;
+
+        var newOrder = new Order 
+        {
+            UserId = user.Id,
+            OrderDate = DateTime.Now,
+            Status = OrderStatus.New,
+            DeliveryType = deliveryType,
+            Address = deliveryType == "Доставка" ? address : "Самовывоз из магазина",
+            TotalPrice = totalPrice,
+            OrderItems = new List<OrderItem>()
+        };
+
+        var cartItems = CartService.GetItems(userName);
+        foreach (var item in cartItems)
+        {
+            // 1. Добавляем товар в чек, обязательно указывая размер
+            newOrder.OrderItems.Add(new OrderItem
+            {
+                ShoeId = item.Shoe.Id,
+                Size = item.Size.ToString(), // Сохраняем выбранный размер
+                Quantity = item.Quantity,
+                PriceAtOrder = item.Shoe.Price,
+                UnitPrice = item.Shoe.Price
+            });
+
+            // 2. Ищем этот товар и этот размер на складе
+            var shoeSizeOnStock = await DbContext.Set<ShoeSize>()
+                .FirstOrDefaultAsync(s => s.ShoeId == item.Shoe.Id && s.Size == item.Size.ToString());
+
+            // 3. Списываем остатки
+            if (shoeSizeOnStock != null)
+            {
+                shoeSizeOnStock.Quantity -= item.Quantity;
+                
+                // Защита от отрицательных остатков (на случай багов или одновременных покупок)
+                if (shoeSizeOnStock.Quantity < 0) 
+                {
+                    shoeSizeOnStock.Quantity = 0;
+                }
+                
+                DbContext.Update(shoeSizeOnStock);
+            }
+        }
+
+        DbContext.Orders.Add(newOrder);
+        await DbContext.SaveChangesAsync(); // Сохраняем и заказ, и новые остатки одним запросом
+        
+        CartService.ClearCart(userName); 
+        Navigation.NavigateTo("/profile");
+    }
+}

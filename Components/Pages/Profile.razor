@@ -1,0 +1,242 @@
+@page "/profile"
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using MyWebApp.Data
+@using MyWebApp.Models
+@using Microsoft.AspNetCore.Components.Endpoints
+
+@inject IServiceScopeFactory ScopeFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+@attribute [Authorize] 
+@attribute [ExcludeFromInteractiveRouting] 
+
+<PageTitle>Мой профиль</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm mt-4 mb-4">
+            <div class="card-header bg-white">
+                <h4 class="mb-0"><i class="bi bi-person-gear"></i> Настройки профиля</h4>
+            </div>
+            <div class="card-body">
+                @if (isLoading)
+                {
+                    <div class="text-center"><div class="spinner-border text-primary"></div></div>
+                }
+                else
+                {
+                    @if (!string.IsNullOrEmpty(statusMessage))
+                    {
+                        <div class="alert alert-success">@statusMessage</div>
+                    }
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    <EditForm Model="profileModel" method="post" OnValidSubmit="SaveProfile" FormName="profile-form" Enhance="false">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">Email (нельзя изменить)</label>
+                            <input type="text" class="form-control bg-light" value="@profileModel.Email" disabled />
+                            <input type="hidden" name="profileModel.Email" value="@profileModel.Email" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Ваш Логин (Отображаемое имя)</label>
+                            <InputText @bind-Value="profileModel.UserName" class="form-control" />
+                            <ValidationMessage For="() => profileModel.UserName" class="text-danger" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Номер телефона</label>
+                            <InputText @bind-Value="profileModel.PhoneNumber" class="form-control" />
+                            <ValidationMessage For="() => profileModel.PhoneNumber" class="text-danger" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Сохранить изменения</button>
+                    </EditForm>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-5">
+            <div class="card-header bg-white">
+                <h4 class="mb-0"><i class="bi bi-box-seam"></i> Мои заказы</h4>
+            </div>
+            <div class="card-body p-0">
+                @if (myOrders == null)
+                {
+                    <div class="text-center p-4"><div class="spinner-border text-primary"></div></div>
+                }
+                else if (myOrders.Count == 0)
+                {
+                    <div class="p-4 text-center text-muted">
+                        У вас пока нет заказов. <br/> <a href="/shoes" class="btn btn-outline-primary mt-2">В каталог</a>
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var order in myOrders)
+                        {
+                            <li class="list-group-item p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 fw-bold">Заказ #@order.Id</h6>
+                                    <span class="badge @GetStatusColor(order.Status) fs-6">@TranslateStatus(order.Status)</span>
+                                </div>
+                                <div class="text-muted small">
+                                    <i class="bi bi-calendar"></i> @order.OrderDate.ToString("dd.MM.yyyy HH:mm") <br/>
+                                    <i class="bi bi-truck"></i> @order.DeliveryType (@order.Address)
+                                </div>
+                                <div class="mt-2 fw-bold text-end">
+                                    Итого: @order.TotalPrice.ToString("N0") ₽
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private ProfileViewModel profileModel { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? status { get; set; }
+
+    private List<Order>? myOrders;
+    private bool isLoading = true;
+    private string statusMessage = "";
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (status == "success")
+        {
+            statusMessage = "Профиль успешно обновлен!";
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+
+        if (userPrincipal.Identity?.IsAuthenticated == true)
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var scopedUserManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            var scopedDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var currentUser = await scopedUserManager.GetUserAsync(userPrincipal);
+            if (currentUser != null)
+            {
+                var currentUserId = currentUser.Id;
+                
+                myOrders = await scopedDbContext.Orders
+                    .AsNoTracking()
+                    .Where(o => o.UserId == currentUserId)
+                    .OrderByDescending(o => o.OrderDate)
+                    .ToListAsync();
+
+                if (string.IsNullOrEmpty(profileModel.Email))
+                {
+                    profileModel.Email = currentUser.Email ?? "";
+                    profileModel.UserName = currentUser.UserName ?? "";
+                    profileModel.PhoneNumber = currentUser.PhoneNumber ?? "";
+                }
+            }
+        }
+        isLoading = false;
+    }
+
+    private async Task SaveProfile()
+    {
+        statusMessage = ""; errorMessage = "";
+        
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+
+        using var scope = ScopeFactory.CreateScope();
+        var scopedUserManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var scopedSignInManager = scope.ServiceProvider.GetRequiredService<SignInManager<IdentityUser>>();
+
+        var currentUser = await scopedUserManager.GetUserAsync(userPrincipal);
+        if (currentUser == null) return;
+        
+        if (currentUser.UserName != profileModel.UserName)
+        {
+            var existingUser = await scopedUserManager.FindByNameAsync(profileModel.UserName);
+            if (existingUser != null && existingUser.Id != currentUser.Id)
+            {
+                errorMessage = "Этот логин уже занят другим пользователем.";
+                return;
+            }
+
+            var setUserNameResult = await scopedUserManager.SetUserNameAsync(currentUser, profileModel.UserName);
+            
+            if (setUserNameResult.Succeeded)
+            {
+                var setEmailResult = await scopedUserManager.SetEmailAsync(currentUser, profileModel.UserName);
+                if (!setEmailResult.Succeeded)
+                {
+                    errorMessage = "Ошибка при обновлении Email (логина).";
+                    return;
+                }
+            }
+            else
+            {
+                errorMessage = "Не удалось обновить логин.";
+                return;
+            }
+        }
+
+        if (currentUser.PhoneNumber != profileModel.PhoneNumber)
+        {
+            var setPhoneResult = await scopedUserManager.SetPhoneNumberAsync(currentUser, profileModel.PhoneNumber);
+            if (!setPhoneResult.Succeeded) 
+            { 
+                errorMessage = "Не удалось обновить номер телефона."; 
+                return; 
+            }
+        }
+
+        await scopedSignInManager.RefreshSignInAsync(currentUser);
+        NavigationManager.NavigateTo("/profile?status=success", forceLoad: true);
+    }
+
+    public class ProfileViewModel
+    {
+        public string Email { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+    }
+
+    private string TranslateStatus(OrderStatus status) => status switch
+    {
+        OrderStatus.New => "Новый",
+        OrderStatus.Processed => "В обработке",
+        OrderStatus.Shipped => "В пути",
+        OrderStatus.Completed => "Доставлен",
+        OrderStatus.Cancelled => "Отменен",
+        _ => "Неизвестно"
+    };
+
+    private string GetStatusColor(OrderStatus status) => status switch
+    {
+        OrderStatus.New => "bg-secondary text-white",
+        OrderStatus.Processed => "bg-warning text-dark",
+        OrderStatus.Shipped => "bg-info text-dark",
+        OrderStatus.Completed => "bg-success text-white",
+        OrderStatus.Cancelled => "bg-danger text-white",
+        _ => "bg-secondary"
+    };
+}

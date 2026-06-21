@@ -1,0 +1,348 @@
+@page "/manager/products"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Hosting
+@using Microsoft.EntityFrameworkCore
+@using MyWebApp.Data
+@using MyWebApp.Models
+@using System.IO
+
+@attribute [Authorize(Roles = "Системный администратор, Администратор, Менеджер")]
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+
+@inject IServiceScopeFactory ScopeFactory
+@inject IWebHostEnvironment Environment
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Управление товарами</h3>
+        <button class="btn btn-primary" @onclick="CreateNewShoe">Добавить товар</button>
+    </div>
+
+    @if (shoesList == null)
+    {
+        <p><em>Загрузка товаров...</em></p>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Фото</th>
+                    <th>Название</th>
+                    <th>Цена</th>
+                    <th>Размеры (в наличии)</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var shoe in shoesList)
+                {
+                    <tr>
+                        <td>
+                            @if (!string.IsNullOrEmpty(shoe.ImagePath))
+                            {
+                                <img src="@shoe.ImagePath" alt="@shoe.Name" style="width: 50px; height: 50px; object-fit: cover;" class="rounded" />
+                            }
+                            else
+                            {
+                                <div class="bg-secondary text-white text-center rounded" style="width: 50px; height: 50px; line-height: 50px; font-size: 12px;">Нет фото</div>
+                            }
+                        </td>
+                        <td>@shoe.Name</td>
+                        <td>@shoe.Price.ToString("N2") ₽</td>
+                        <td>
+                            @if (shoe.ShoeSizes != null && shoe.ShoeSizes.Any())
+                            {
+                                @foreach (var size in shoe.ShoeSizes)
+                                {
+                                    <span class="badge @(size.Quantity > 0 ? "bg-success" : "bg-danger") me-1">
+                                        @size.Size (@size.Quantity шт.)
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">Размеры не указаны</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditShoe(shoe)">Изменить</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteShoe(shoe.Id)">Удалить</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (isModalOpen)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingShoe.Id == 0 ? "Новый товар" : "Редактирование товара")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <EditForm Model="editingShoe" OnValidSubmit="SaveShoe">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Название</label>
+                                <InputText @bind-Value="editingShoe.Name" class="form-control" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Цена</label>
+                                <InputNumber @bind-Value="editingShoe.Price" class="form-control" required />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Бренд</label>
+                                <InputSelect @bind-Value="editingShoe.BrandId" class="form-select" required>
+                                    @foreach (var brand in brandsList)
+                                    {
+                                        <option value="@brand.Id">@brand.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Категория</label>
+                                <InputSelect @bind-Value="editingShoe.CategoryId" class="form-select" required>
+                                    @foreach (var category in categoriesList)
+                                    {
+                                        <option value="@category.Id">@category.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Пол</label>
+                                <InputSelect @bind-Value="editingShoe.Gender" class="form-select">
+                                    <option value="Мужской">Мужской</option>
+                                    <option value="Женский">Женский</option>
+                                    <option value="Унисекс">Унисекс</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Материал</label>
+                                <InputText @bind-Value="editingShoe.Material" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Сезон</label>
+                                <InputText @bind-Value="editingShoe.Season" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Фотография товара</label>
+                            <InputFile OnChange="HandleFileSelected" class="form-control" accept=".jpg,.jpeg,.png" />
+                            @if (!string.IsNullOrEmpty(editingShoe.ImagePath))
+                            {
+                                <div class="mt-2">
+                                    <img src="@editingShoe.ImagePath" style="max-height: 120px; object-fit: contain;" class="img-thumbnail" />
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Описание</label>
+                            <InputTextArea @bind-Value="editingShoe.Description" class="form-control" rows="3" />
+                        </div>
+
+                        <hr />
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6>Управление размерами и складом</h6>
+                            <button type="button" class="btn btn-sm btn-secondary" @onclick="AddSizeRow">+ Добавить размер</button>
+                        </div>
+
+                        <table class="table table-sm mt-2">
+                            <thead>
+                                <tr>
+                                    <th>Размер (например: 42)</th>
+                                    <th>Количество на складе (шт.)</th>
+                                    <th>Удалить</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var size in editingShoe.ShoeSizes)
+                                {
+                                    <tr>
+                                        <td><InputText @bind-Value="size.Size" class="form-control form-control-sm" placeholder="Размер" required /></td>
+                                        <td><InputNumber @bind-Value="size.Quantity" class="form-control form-control-sm" min="0" required /></td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-danger" @onclick="() => editingShoe.ShoeSizes.Remove(size)">✕</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        <div class="modal-footer px-0 pb-0 mt-4">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Отмена</button>
+                            <button type="submit" class="btn btn-success">Сохранить</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Shoe> shoesList = new();
+    private List<Brand> brandsList = new();
+    private List<Category> categoriesList = new();
+    
+    private Shoe editingShoe = new();
+    private bool isModalOpen = false;
+    private IBrowserFile? selectedFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        shoesList = await context.Shoes.Include(s => s.ShoeSizes).ToListAsync();
+        brandsList = await context.Brands.ToListAsync();
+        categoriesList = await context.Categories.ToListAsync();
+    }
+
+    private void CreateNewShoe()
+    {
+        editingShoe = new Shoe 
+        { 
+            ShoeSizes = new List<ShoeSize>(),
+            Gender = "Мужской",
+            Material = "Кожа",
+            Season = "Лето",
+            // Ставим дефолтные ID из существующих записей, чтобы избежать 0
+            BrandId = brandsList.FirstOrDefault()?.Id ?? 0,
+            CategoryId = categoriesList.FirstOrDefault()?.Id ?? 0
+        };
+        selectedFile = null;
+        isModalOpen = true;
+    }
+
+    private async Task EditShoe(Shoe shoe)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var shoeFromDb = await context.Shoes
+            .Include(s => s.ShoeSizes)
+            .FirstOrDefaultAsync(s => s.Id == shoe.Id);
+
+        if (shoeFromDb != null)
+        {
+            editingShoe = shoeFromDb;
+            selectedFile = null;
+            isModalOpen = true;
+        }
+    }
+
+    private void AddSizeRow()
+    {
+        editingShoe.ShoeSizes.Add(new ShoeSize { Quantity = 1 });
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+    }
+
+    private async Task SaveShoe()
+    {
+        if (selectedFile != null)
+        {
+            try
+            {
+                var folderPath = Path.Combine(Environment.WebRootPath, "img", "shoes");
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                var extension = Path.GetExtension(selectedFile.Name);
+                var fileName = $"{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(folderPath, fileName);
+
+                using var stream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5);
+                using var fileStream = new FileStream(filePath, FileMode.Create);
+                await stream.CopyToAsync(fileStream);
+
+                editingShoe.ImagePath = $"/img/shoes/{fileName}";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при загрузке фото: {ex.Message}");
+            }
+        }
+
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Обнуляем навигационные свойства, чтобы EF Core не пытался дублировать бренды/категории
+        editingShoe.Brand = null;
+        editingShoe.Category = null;
+
+        foreach (var size in editingShoe.ShoeSizes)
+        {
+            size.ShoeId = editingShoe.Id;
+        }
+
+        if (editingShoe.Id == 0)
+        {
+            context.Shoes.Add(editingShoe);
+        }
+        else
+        {
+            context.Shoes.Update(editingShoe);
+        }
+
+        await context.SaveChangesAsync();
+        isModalOpen = false;
+        await LoadData();
+    }
+
+    private async Task DeleteShoe(int id)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var shoe = await context.Shoes.Include(s => s.ShoeSizes).FirstOrDefaultAsync(s => s.Id == id);
+        if (shoe != null)
+        {
+            if (!string.IsNullOrEmpty(shoe.ImagePath) && shoe.ImagePath.StartsWith("/img/shoes/"))
+            {
+                var fullPath = Path.Combine(Environment.WebRootPath, shoe.ImagePath.TrimStart('/'));
+                if (File.Exists(fullPath))
+                {
+                    File.Delete(fullPath);
+                }
+            }
+
+            context.Shoes.Remove(shoe);
+            await context.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+
+    private void CloseModal()
+    {
+        isModalOpen = false;
+    }
+}

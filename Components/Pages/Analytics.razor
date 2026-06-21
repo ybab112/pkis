@@ -1,0 +1,135 @@
+@page "/admin/analytics"
+@using System.Text
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.EntityFrameworkCore
+@using MyWebApp.Data
+@using MyWebApp.Models
+
+@attribute [Authorize(Roles = "Системный администратор, Администратор")]
+@rendermode InteractiveServer
+
+@inject IServiceScopeFactory ScopeFactory
+
+<h2 class="mb-4">Аналитика и отчетность</h2>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white shadow-sm text-center p-3">
+            <h5>Общая выручка</h5>
+            <h3>@totalRevenue.ToString("N0") ₽</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white shadow-sm text-center p-3">
+            <h5>Выполнено заказов</h5>
+            <h3>@completedOrdersCount</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark shadow-sm text-center p-3">
+            <h5>Товаров в каталоге</h5>
+            <h3>@totalProductsCount шт.</h3>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title m-0">Продажи по категориям</h5>
+            
+            @if (!string.IsNullOrEmpty(downloadCsvUrl))
+            {
+                <a class="btn btn-outline-success" 
+                href="@downloadCsvUrl" 
+                download="@($"Analytics_{DateTime.Now:dd-MM-yyyy}.csv")">
+                    <i class="bi bi-file-earmark-excel"></i> Скачать отчет (.csv)
+                </a>
+            }
+        </div>
+
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Категория</th>
+                    <th>Продано единиц</th>
+                    <th>Сумма продаж</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in categoryReport)
+                {
+                    <tr>
+                        <td>@item.CategoryName</td>
+                        <td>@item.UnitsSold шт.</td>
+                        <td>@item.TotalSum.ToString("N0") ₽</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    public class CategoryReportItem
+    {
+        public string CategoryName { get; set; } = string.Empty;
+        public int UnitsSold { get; set; }
+        public decimal TotalSum { get; set; }
+    }
+
+    private decimal totalRevenue;
+    private int completedOrdersCount;
+    private int totalProductsCount;
+    private List<CategoryReportItem> categoryReport = new();
+    
+    private string downloadCsvUrl = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        totalProductsCount = await context.Shoes.CountAsync();
+        
+        if (await context.Database.CanConnectAsync())
+        {
+            var allOrders = await context.Orders.ToListAsync();
+
+            var successfulOrders = allOrders
+                .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Shipped)
+                .ToList();
+
+            completedOrdersCount = successfulOrders.Count;
+            totalRevenue = successfulOrders.Sum(o => o.TotalPrice);
+
+            categoryReport = new List<CategoryReportItem>
+            {
+                new() { CategoryName = "Продажи загружены", UnitsSold = completedOrdersCount, TotalSum = totalRevenue }
+            };
+
+            PrepareCsvForDownload();
+        }
+    }
+
+    private void PrepareCsvForDownload()
+    {
+        if (categoryReport == null || !categoryReport.Any()) return;
+
+        var sb = new StringBuilder();
+        sb.Append('\uFEFF'); 
+        sb.AppendLine("Категория;Продано (шт);Выручка (руб)");
+
+        foreach (var item in categoryReport)
+        {
+            sb.AppendLine($"{item.CategoryName};{item.UnitsSold};{item.TotalSum}");
+        }
+
+        var fileBytes = Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(fileBytes);
+        
+        downloadCsvUrl = $"data:text/csv;charset=utf-8;base64,{base64}";
+    }
+}

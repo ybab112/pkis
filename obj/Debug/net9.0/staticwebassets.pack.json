@@ -1,16 +1,32 @@
 {
   "Files": [
     {
-      "Id": "C:\\Users\\Администратор\\MyWebApp\\obj\\Debug\\net9.0\\scopedcss\\projectbundle\\MyWebApp.bundle.scp.css",
-      "PackagePath": "staticwebassets\\MyWebApp.81wsvdbxef.bundle.scp.css"
-    },
-    {
       "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\css\\site.css",
       "PackagePath": "staticwebassets\\css\\site.css"
     },
     {
       "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\favicon.ico",
       "PackagePath": "staticwebassets\\favicon.ico"
+    },
+    {
+      "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\img\\shoes\\00cddd39-01a2-4b57-8c6e-efc01e95cf73.jpg",
+      "PackagePath": "staticwebassets\\img\\shoes\\00cddd39-01a2-4b57-8c6e-efc01e95cf73.jpg"
+    },
+    {
+      "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\img\\shoes\\23887319-bd7c-4c4f-9a23-7022a28178e1.jpg",
+      "PackagePath": "staticwebassets\\img\\shoes\\23887319-bd7c-4c4f-9a23-7022a28178e1.jpg"
+    },
+    {
+      "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\img\\shoes\\6db89d51-59f8-40a1-ad3d-90edbc9cf21b.jpg",
+      "PackagePath": "staticwebassets\\img\\shoes\\6db89d51-59f8-40a1-ad3d-90edbc9cf21b.jpg"
+    },
+    {
+      "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\img\\shoes\\7a2d6ec4-0176-446e-aa79-075a363fb4ea.jpg",
+      "PackagePath": "staticwebassets\\img\\shoes\\7a2d6ec4-0176-446e-aa79-075a363fb4ea.jpg"
+    },
+    {
+      "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\img\\shoes\\bb7c2e7c-c54e-4693-97c3-e715e73a6b49.jpg",
+      "PackagePath": "staticwebassets\\img\\shoes\\bb7c2e7c-c54e-4693-97c3-e715e73a6b49.jpg"
     },
     {
       "Id": "C:\\Users\\Администратор\\MyWebApp\\wwwroot\\js\\site.js",

@@ -1,0 +1,119 @@
+@page "/register"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Endpoints
+@attribute [ExcludeFromInteractiveRouting]
+
+@inject UserManager<IdentityUser> UserManager
+@inject SignInManager<IdentityUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Регистрация</h3>
+                @if (identityErrors.Any())
+                {
+                    <div class="alert alert-danger">
+                        @foreach (var error in identityErrors)
+                        {
+                            <p class="mb-0">@error</p>
+                        }
+                    </div>
+                }
+
+                <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Email (Логин)</label>
+                        <InputText @bind-Value="Input.Email" class="form-control" placeholder="name@example.com" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Номер телефона</label>
+                        <InputText @bind-Value="Input.PhoneNumber" class="form-control" placeholder="+7 (999) 123-45-67" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Пароль</label>
+                        <InputText @bind-Value="Input.Password" type="password" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Подтверждение пароля</label>
+                        <InputText @bind-Value="Input.ConfirmPassword" type="password" class="form-control" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Зарегистрироваться</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<string> identityErrors = new();
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task RegisterUser()
+    {
+        identityErrors.Clear();
+
+        var existingUser = await UserManager.FindByEmailAsync(Input.Email);
+        if (existingUser != null)
+        {
+            identityErrors.Add("Пользователь с таким Email уже зарегистрирован.");
+            return; 
+        }
+
+        var user = new IdentityUser 
+        { 
+            UserName = Input.Email, 
+            Email = Input.Email,
+            PhoneNumber = Input.PhoneNumber 
+        };
+        
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (result.Succeeded)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                identityErrors.Add(error.Description);
+            }
+        }
+    }
+
+    public class InputModel
+    {
+        [Required(ErrorMessage = "Почта обязательна для заполнения")]
+        [EmailAddress(ErrorMessage = "Некорректный формат электронной почты")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Телефон обязателен для заполнения")]
+        [RegularExpression(@"^(\+7|8)[\s\-]?\(?[489][0-9]{2}\)?[\s\-]?[0-9]{3}[\s\-]?[0-9]{2}[\s\-]?[0-9]{2}$", 
+            ErrorMessage = "Введите корректный номер РФ (например: +79991234567 или 89991234567)")]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Пароль обязателен")]
+        [MinLength(6, ErrorMessage = "Пароль должен содержать минимум 6 символов")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Подтвердите пароль")]
+        [Compare("Password", ErrorMessage = "Пароли не совпадают")]
+        [DataType(DataType.Password)]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

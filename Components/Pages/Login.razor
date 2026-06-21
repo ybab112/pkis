@@ -1,0 +1,85 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Endpoints 
+
+@attribute [ExcludeFromInteractiveRouting] 
+
+@inject UserManager<IdentityUser> UserManager
+@inject SignInManager<IdentityUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Вход в аккаунт</h3>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Email или Логин</label>
+                        <InputText @bind-Value="Input.Email" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Пароль</label>
+                        <InputText @bind-Value="Input.Password" type="password" class="form-control" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Войти</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string errorMessage = string.Empty;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+    
+    private async Task LoginUser()
+    {
+        errorMessage = string.Empty;
+
+        var user = await UserManager.FindByEmailAsync(Input.Email) 
+                   ?? await UserManager.FindByNameAsync(Input.Email);
+
+        if (user == null)
+        {
+            errorMessage = "Пользователь с такими данными не найден.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(user.UserName, Input.Password, false, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            errorMessage = "Неверный пароль.";
+        }
+    }
+
+    public class InputModel
+    {
+        [Required(ErrorMessage = "Поле обязательно для заполнения")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Пароль обязателен")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+    }
+}

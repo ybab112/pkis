@@ -1,31 +1,183 @@
-html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
+/* ==========================================
+   ГЛОБАЛЬНЫЙ ДИЗАЙН САЙТА
+   ========================================== */
 
 body {
-  margin-bottom: 60px;
+    background-color: #F4F8FA !important;
+    color: #1A2B3C !important;
+    margin: 0;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.page {
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+main {
+    flex: 1;
+}
+
+/* ==========================================
+   ЛЕВОЕ НАВИГАЦИОННОЕ МЕНЮ (СВЕТЛОЕ)
+   ========================================== */
+
+.sidebar {
+    background-color: #F8FAFC !important; /* Светло-серый, почти белый */
+    background-image: none !important; /* УБИЛИ ТЕМНЫЙ ГРАДИЕНТ */
+    border-right: 1px solid #E2E8F0 !important;
+    width: 260px; /* Сделали панель чуть шире */
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Верхняя шапка меню (SHOE STORE) */
+.sidebar .top-row {
+    background-color: #0D47A1 !important; /* Синий цвет */
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+}
+
+.sidebar .top-row a, 
+.sidebar .navbar-brand {
+    color: #FFFFFF !important;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+/* ==========================================
+   ШИРОКИЕ И КРАСИВЫЕ КНОПКИ
+   ========================================== */
+
+.nav-scrollable {
+    padding-top: 1rem;
+}
+
+/* Контейнер кнопки */
+.nav-item {
+    padding: 0 15px !important; /* Отступы от краев панели */
+    margin-bottom: 8px !important;
+    width: 100%;
+}
+
+/* Сама кнопка (УВЕЛИЧЕНА ШИРИНА И ВЫСОТА) */
+.nav-item .nav-link {
+    color: #475569 !important; /* Серо-синий текст */
+    border-radius: 12px !important; /* Более мягкие углы */
+    padding: 14px 20px !important; /* Увеличили внутреннее пространство! */
+    display: flex !important;
+    align-items: center !important;
+    font-weight: 500 !important;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out !important;
+}
+
+/* Иконки внутри кнопок */
+.nav-item .nav-link .bi {
+    margin-right: 16px !important; /* Отодвинули текст от иконки */
+    font-size: 1.3rem !important; /* Сделали иконку чуть крупнее */
+}
+
+/* Эффект наведения мышки */
+.nav-item .nav-link:hover {
+    background-color: #E2E8F0 !important; /* Голубоватый фон */
+    color: #0F172A !important;
+    transform: translateX(4px); /* Легкий сдвиг вправо */
+}
+
+/* АКТИВНАЯ КНОПКА */
+.nav-item .nav-link.active {
+    background-color: #2563EB !important; /* Яркий синий цвет */
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+}
+
+.nav-item .nav-link.active .bi {
+    color: #FFFFFF !important;
+}
+
+/* ==========================================
+   АДАПТАЦИЯ ПОД ТЕЛЕФОНЫ
+   ========================================== */
+@media (max-width: 640px) {
+    .page {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .collapse:not(.show) {
+        display: none;
+    }
+    .navbar-toggler {
+        display: block;
+        background-color: rgba(255, 255, 255, 0.2);
+        border: none;
+        padding: 5px 10px;
+        color: white;
+        cursor: pointer;
+    }
+    .sidebar .top-row {
+        justify-content: space-between;
+    }
+}
+    @media (min-width: 641px) {
+        .navbar-toggler {
+            display: none;
+        }
+
+    .sidebar .nav-item {
+        margin-bottom: 6px !important;
+    }
+
+    .sidebar .nav-link {
+        color: #475569 !important; /* Приятный темно-серый цвет текста */
+        background-color: transparent !important;
+        border-radius: 10px !important; /* Закругленные края */
+        padding: 12px 16px !important; /* Просторные отступы внутри кнопки */
+        font-weight: 500 !important;
+        font-size: 15px !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: all 0.3s ease !important; /* Плавная анимация */
+        text-decoration: none !important;
+    }
+
+    /* Настройка иконок */
+    .sidebar .nav-link .bi {
+        color: #64748B !important; /* Изначальный цвет иконок */
+        font-size: 1.2rem !important;
+        margin-right: 12px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    /* 🌟 ЭФФЕКТ ПРИ НАВЕДЕНИИ МЫШКИ (ХОВЕР) 🌟 */
+    .sidebar .nav-link:hover {
+        background-color: #EFF6FF !important; /* Нежно-голубой фон */
+        color: #2563EB !important; /* Текст становится ярко-синим */
+        transform: translateX(6px) !important; /* Кнопка плавно выезжает вправо */
+    }
+
+    /* Иконка тоже становится синей при наведении */
+    .sidebar .nav-link:hover .bi {
+        color: #2563EB !important; 
+    }
+
+    .sidebar .nav-link.active {
+        background-color: #2563EB !important; /* Яркий синий фон */
+        color: #FFFFFF !important; /* Белый текст */
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important; /* Мягкая синяя тень */
+    }
+
+    .sidebar .nav-link.active .bi {
+        color: #FFFFFF !important; /* Белая иконка */
+    }
 }
